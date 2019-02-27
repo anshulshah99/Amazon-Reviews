@@ -1,3 +1,10 @@
+import psycopg2
+import sys
+import pandas as pd
+import matplotlib.pyplot as plt
+import math
+import numpy as np
+
 def tfidf():  
     conn = psycopg2.connect("dbname=products")
     q1 = conn.cursor()
