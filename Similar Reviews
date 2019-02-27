@@ -1,0 +1,71 @@
+def tfidf():  
+    conn = psycopg2.connect("dbname=products")
+    q1 = conn.cursor()
+    q1.execute('''
+        SELECT regexp_split_to_table(title,'\s+|\n| - |,|-| ') AS word, id FROM amazon 
+        UNION ALL SELECT regexp_split_to_table(description, '\\s+|\n| - |, |-|. | |/') AS word, id FROM amazon
+        UNION ALL SELECT regexp_split_to_table(manufacturer, '\\s+|\n| - |, |-|. | |/') AS word, id FROM amazon
+        GROUP BY word, id;
+        ''')
+    wordD = {}
+    productD = {}
+    retD = {}
+    lst = [[word, pid] for word, pid in q1]
+    for word, pid in lst:
+        if word not in wordD:
+            wordD[word] = []
+        wordD[word].append(pid)
+        if pid not in productD:
+            productD[pid] = []
+        productD[pid].append(word) 
+    for each in lst:
+        wordCount = productD[each[1]].count(each[0])
+        tf = math.log(1 + wordCount, 10)
+        docCount = len(productD.keys())
+        wordDocCount = len(wordD[each[0]])
+        val = docCount/wordDocCount
+        idf = math.log(val, 10)
+        tfidf = tf * idf
+        each.append(tfidf)
+        if each[1] not in retD:
+            retD[each[1]] = []
+        retD[each[1]].append([each[0], tfidf])
+    q1.close()
+    conn.close()
+    return(retD)
+
+def cosine(product):
+    d = tfidf()
+    lst = []
+    for k,v in d.items():
+        score = calc(d, product, k)
+        lst.append([score, k])
+    lst = sorted(lst, reverse = True)
+    print(lst[0:5])
+
+def union(a, b):
+    """ return the union of two lists """
+    return list(set(a) | set(b))
+
+def calc(d, p1, p2):
+    p1List = d[p1]
+    p2List = d[p2]
+    p1words = [word for [word, score] in p1List]
+    p2words = [word for [word, score] in p2List]
+    allWords = union(p1words, p2words)
+    #allWords = list(allWords)
+    p1array = np.zeros(len(allWords))
+    p2array = np.zeros(len(allWords))
+    for [word, score] in p1List:
+        if word in allWords:
+            p1array[allWords.index(word)] = score
+    for [word, score] in p2List:
+         if word in allWords:
+            p2array[allWords.index(word)] = score
+    numerator = np.dot(p1array, p2array)
+    p1square = [p1array[i] ** 2 for i in range(len(allWords))]
+    p2square = [p2array[i] ** 2 for i in range(len(allWords))]
+    denom = math.sqrt(sum(p1square)) * math.sqrt(sum(p2square))
+    return (numerator/denom)
+
+cosine("b000g80lqo")
